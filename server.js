@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
@@ -12,6 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// Cloudinary Setup
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -24,6 +25,7 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Database Model
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   upiId: { type: String, required: true },
@@ -36,6 +38,7 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// ============ ADMIN ROUTES ============
 app.get('/api/admin/users', async (req, res) => {
   const users = await User.find().sort({ createdAt: -1 });
   res.json(users);
@@ -52,11 +55,18 @@ app.post('/api/admin/dispute/:id', async (req, res) => {
   res.json(user);
 });
 
-app.get('/api/client/:id', async (req, res) => {
-  const user = await User.findById(req.params.id);
-  res.json(user);
+// ============ CLIENT ROUTES ============
+// Client dashboard data fetch karega (saari list)
+app.get('/api/client/dashboard', async (req, res) => {
+  try {
+    const users = await User.find().sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
+// Client pay karega (Done dabayega)
 app.post('/api/client/:id/done', upload.single('screenshot'), async (req, res) => {
   const update = { status: 'done', markedAt: new Date() };
   if (req.body.utr) update.utr = req.body.utr;
@@ -65,14 +75,17 @@ app.post('/api/client/:id/done', upload.single('screenshot'), async (req, res) =
   res.json(user);
 });
 
+// Client dispute raise karega
 app.post('/api/client/:id/dispute', async (req, res) => {
   const user = await User.findByIdAndUpdate(req.params.id, { status: 'disputed', markedAt: new Date() }, { new: true });
   res.json(user);
 });
 
+// ============ DATABASE CONNECT ============
+const PORT = process.env.PORT || 3000;
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connected ✅');
-    app.listen(process.env.PORT || 3000, () => console.log(`Server running on port ${process.env.PORT || 3000} 🚀`));
+    app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT} 🚀`));
   })
   .catch(err => console.error('DB Error:', err));
