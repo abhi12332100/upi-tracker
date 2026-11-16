@@ -1,108 +1,154 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Page</title>
+    <title>Client Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md" id="mainCard">
-        <div id="loading" class="text-center text-gray-500">Loading details...</div>
-        <div id="paymentDetails" class="hidden">
-            <div class="text-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">Payment Request</h2>
-            </div>
-            <div class="bg-indigo-50 p-4 rounded-lg mb-6 border border-indigo-100">
-                <div class="flex justify-between items-center mb-3">
-                    <span class="text-gray-600 text-sm">Paying to:</span>
-                    <span id="clientName" class="font-bold text-gray-800"></span>
-                </div>
-                <div class="flex justify-between items-center mb-3">
-                    <span class="text-gray-600 text-sm">UPI ID:</span>
-                    <div class="flex items-center gap-2">
-                        <span id="clientUpi" class="font-mono bg-white px-2 py-1 rounded border text-sm"></span>
-                        <button onclick="copyUpiClient()" class="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600">Copy</button>
-                    </div>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600 text-sm">Amount:</span>
-                    <span id="clientAmount" class="text-xl font-bold text-indigo-700"></span>
-                </div>
-            </div>
-            <div id="statusDisplay" class="mb-4 text-center hidden"></div>
+<body class="bg-gray-50 font-sans p-4">
+    <div class="max-w-5xl mx-auto">
+        <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-indigo-700">Client Dashboard</h1>
+            <button onclick="location.reload()" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded font-bold hover:bg-indigo-200">Refresh List</button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-gray-700">
+                        <th class="p-4 border-b">Name</th>
+                        <th class="p-4 border-b">UPI ID</th>
+                        <th class="p-4 border-b">Amount</th>
+                        <th class="p-4 border-b">Status</th>
+                        <th class="p-4 border-b">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="userTable">
+                    <!-- Data comes here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+            <h2 class="text-xl font-bold mb-4">Confirm Payment</h2>
+            <p class="text-sm text-gray-600 mb-4">You are marking payment for: <span id="modalName" class="font-bold"></span></p>
+            
             <form id="paymentForm" class="space-y-4">
+                <input type="hidden" id="modalUserId">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">UTR (Optional)</label>
-                    <input type="text" id="utrInput" placeholder="Enter UTR" class="w-full border p-2 rounded focus:outline-indigo-500 text-sm">
+                    <input type="text" id="utrInput" class="w-full border p-2 rounded" placeholder="Enter UTR">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Screenshot (Optional)</label>
                     <input type="file" id="screenshotInput" accept="image/*" class="w-full border p-2 rounded text-sm bg-gray-50">
                 </div>
-                <button type="submit" id="submitBtn" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">Done (I have paid)</button>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700">Confirm Payment</button>
+                    <button type="button" onclick="closeModal()" class="flex-1 bg-gray-300 text-gray-800 font-bold py-2 rounded hover:bg-gray-400">Cancel</button>
+                </div>
             </form>
-            <div class="mt-6 text-center border-t pt-4">
-                <p class="text-xs text-gray-500 mb-2">Marked by mistake?</p>
-                <button onclick="raiseDisputeClient()" class="text-sm text-red-600 font-semibold hover:underline">Raise Dispute</button>
-            </div>
         </div>
-        <div id="errorState" class="hidden text-center text-red-500">Invalid Link.</div>
     </div>
+
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('id');
-        let currentUpi = '';
-        async function loadClientData() {
-            if (!userId) { document.getElementById('loading').classList.add('hidden'); document.getElementById('errorState').classList.remove('hidden'); return; }
-            const res = await fetch(`/api/client/${userId}`);
-            if (!res.ok) { document.getElementById('loading').classList.add('hidden'); document.getElementById('errorState').classList.remove('hidden'); return; }
-            const user = await res.json();
-            document.getElementById('loading').classList.add('hidden');
-            document.getElementById('paymentDetails').classList.remove('hidden');
-            document.getElementById('clientName').innerText = user.name;
-            document.getElementById('clientUpi').innerText = user.upiId;
-            document.getElementById('clientAmount').innerText = `₹${user.amount}`;
-            currentUpi = user.upiId;
-            if (user.status === 'done') {
-                document.getElementById('statusDisplay').classList.remove('hidden');
-                document.getElementById('statusDisplay').innerHTML = '<span class="bg-green-100 text-green-800 px-4 py-2 rounded-full font-bold text-sm">✅ Marked Done</span>';
-                document.getElementById('paymentForm').classList.add('hidden');
-            } else if (user.status === 'disputed') {
-                document.getElementById('statusDisplay').classList.remove('hidden');
-                document.getElementById('statusDisplay').innerHTML = '<span class="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold text-sm">⚠️ Under Dispute</span>';
-                document.getElementById('paymentForm').classList.add('hidden');
+        async function loadDashboard() {
+            try {
+                const res = await fetch('/api/client/dashboard');
+                const users = await res.json();
+                const tbody = document.getElementById('userTable');
+                tbody.innerHTML = '';
+
+                if(users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">No records found.</td></tr>';
+                    return;
+                }
+
+                users.forEach(user => {
+                    let statusBadge = user.status === 'pending' ? '<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-bold">Pending</span>' :
+                                      user.status === 'done' ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">Paid ✅</span>' :
+                                      '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold">Disputed ⚠️</span>';
+                    
+                    let actionBtn = '';
+                    if (user.status === 'pending') {
+                        actionBtn = `<button onclick="openModal('${user._id}', '${user.name}')" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-indigo-700">Pay Now</button>`;
+                    } else if (user.status === 'done') {
+                        actionBtn = `<button onclick="raiseDispute('${user._id}')" class="bg-red-100 text-red-700 px-3 py-1 rounded text-sm font-bold hover:bg-red-200">Dispute</button>`;
+                    } else {
+                        actionBtn = `<span class="text-gray-400 text-sm">Under Review</span>`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 border-b';
+                    tr.innerHTML = `
+                        <td class="p-4 font-medium text-gray-800">${user.name}</td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-sm bg-gray-100 p-1 rounded">${user.upiId}</span>
+                                <button onclick="copyUpi('${user.upiId}')" class="bg-blue-500 text-white text-xs px-2 py-1 rounded hover:bg-blue-600">Copy</button>
+                            </div>
+                        </td>
+                        <td class="p-4 font-bold text-gray-700">₹${user.amount}</td>
+                        <td class="p-4">${statusBadge}</td>
+                        <td class="p-4">${actionBtn}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
             }
-            if (user.utr) document.getElementById('utrInput').value = user.utr;
         }
-        function copyUpiClient() { if (currentUpi) navigator.clipboard.writeText(currentUpi).then(() => alert(`Copied: ${currentUpi}`)); }
+
+        function openModal(id, name) {
+            document.getElementById('modalUserId').value = id;
+            document.getElementById('modalName').innerText = name;
+            document.getElementById('paymentModal').classList.remove('hidden');
+            document.getElementById('paymentModal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('paymentModal').classList.add('hidden');
+            document.getElementById('paymentModal').classList.remove('flex');
+            document.getElementById('paymentForm').reset();
+        }
+
+        function copyUpi(text) {
+            navigator.clipboard.writeText(text).then(() => alert(`Copied: ${text}`));
+        }
+
         document.getElementById('paymentForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            btn.innerText = 'Submitting...'; btn.disabled = true;
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.innerText = 'Processing...';
+            btn.disabled = true;
+
+            const id = document.getElementById('modalUserId').value;
             const utr = document.getElementById('utrInput').value;
             const file = document.getElementById('screenshotInput').files[0];
+
             const formData = new FormData();
             formData.append('utr', utr);
             if (file) formData.append('screenshot', file);
-            const res = await fetch(`/api/client/${userId}/done`, { method: 'POST', body: formData });
-            if (res.ok) {
-                document.getElementById('statusDisplay').classList.remove('hidden');
-                document.getElementById('statusDisplay').innerHTML = '<span class="bg-green-100 text-green-800 px-4 py-2 rounded-full font-bold text-sm">✅ Marked Done</span>';
-                document.getElementById('paymentForm').classList.add('hidden');
-                window.scrollTo(0, 0);
-            } else {
-                alert('Error!'); btn.innerText = 'Done (I have paid)'; btn.disabled = false;
-            }
+
+            await fetch(`/api/client/${id}/done`, { method: 'POST', body: formData });
+            
+            closeModal();
+            loadDashboard();
+            btn.innerText = 'Confirm Payment';
+            btn.disabled = false;
         });
-        async function raiseDisputeClient() {
-            if (!confirm('Raise Dispute?')) return;
-            await fetch(`/api/client/${userId}/dispute`, { method: 'POST' });
-            document.getElementById('statusDisplay').classList.remove('hidden');
-            document.getElementById('statusDisplay').innerHTML = '<span class="bg-red-100 text-red-800 px-4 py-2 rounded-full font-bold text-sm">⚠️ Under Dispute</span>';
-            document.getElementById('paymentForm').classList.add('hidden');
+
+        async function raiseDispute(id) {
+            if (!confirm('Raise dispute for this payment?')) return;
+            await fetch(`/api/client/${id}/dispute`, { method: 'POST' });
+            loadDashboard();
         }
-        loadClientData();
+
+        loadDashboard();
     </script>
 </body>
 </html>
